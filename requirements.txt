@@ -1,0 +1,6 @@
+py-cord>=2.4.0
+pyotp
+pyqrcode
+pypng
+python-dotenv
+aiohttp

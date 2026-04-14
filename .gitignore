@@ -1,0 +1,38 @@
+# Environment & secrets
+.env
+*.env
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+
+# QR codes (generated at runtime)
+data/*.png
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Claude Code local settings
+.claude/
+
+# Testing cache
+.pytest_cache/
+
+# Reference repos (not used in this project)
+HQ-Announce/

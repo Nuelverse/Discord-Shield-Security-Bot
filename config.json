@@ -1,0 +1,40 @@
+{
+    "roles": {
+        "dangerous_permissions": [
+            "administrator",
+            "manage_guild",
+            "manage_roles",
+            "manage_channels",
+            "ban_members",
+            "kick_members",
+            "manage_webhooks",
+            "view_audit_log",
+            "manage_expressions",
+            "manage_threads",
+            "mention_everyone",
+            "moderate_members"
+        ]
+    },
+
+    "link_filter": {
+        "ignore_roles": []
+    },
+
+    "panic": {
+        "dangerous_permissions": [
+            "kick_members",
+            "ban_members",
+            "administrator",
+            "manage_channels",
+            "manage_guild",
+            "mention_everyone",
+            "manage_nicknames",
+            "manage_roles",
+            "manage_webhooks",
+            "manage_events",
+            "view_audit_log",
+            "deafen_members",
+            "move_members"
+        ]
+    }
+}
