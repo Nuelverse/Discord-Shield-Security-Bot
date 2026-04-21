@@ -1,14 +1,17 @@
 """
-Audit Log — logs ALL deleted and edited messages to the guild log channel.
+Audit Log — logs deleted/edited messages and member bans to the guild log channel.
 
 Events handled:
   on_message_delete  →  embed with author, channel, message ID, and content
   on_message_edit    →  embed with author, channel, before/after content diff, jump link
+  on_member_ban      →  embed with banned user, responsible mod, and audit-log reason
 
 Note: Discord only provides message content from its internal cache.
 Messages sent before the bot started (or in large guilds where the cache
 is evicted) will show "(not cached)" for the content.
 """
+
+import asyncio
 
 import discord
 from discord.ext import commands
@@ -38,6 +41,10 @@ class AuditLog(commands.Cog):
     @commands.Cog.listener()
     async def on_message_delete(self, message: discord.Message):
         if message.author.bot or not message.guild:
+            return
+        # Suppressed — link filter already logged this deletion specifically
+        if message.id in self.bot.deleted_by_filter:
+            self.bot.deleted_by_filter.discard(message.id)
             return
         if not db_handler.check_guild(self.bot.CONN, message.guild.id):
             return
@@ -90,6 +97,12 @@ class AuditLog(commands.Cog):
             return
         if after.author.bot or not after.guild:
             return
+        # Yield briefly so the link filter can run its edit handler first.
+        # If it catches the URL it will mark the ID; we skip to avoid double-logging.
+        await asyncio.sleep(0.2)
+        if after.id in self.bot.deleted_by_filter:
+            # The delete event will clean up the set — don't discard here
+            return
         if not db_handler.check_guild(self.bot.CONN, after.guild.id):
             return
         log_ch = self._get_log_ch(after.guild.id)
@@ -120,6 +133,52 @@ class AuditLog(commands.Cog):
 
         embed.timestamp = discord.utils.utcnow()
         embed.set_footer(text=f"Message ID: {after.id}")
+        await self._safe_send(log_ch, embed=embed)
+
+    # ------------------------------------------------------------------
+    # Member banned
+    # ------------------------------------------------------------------
+
+    @commands.Cog.listener()
+    async def on_member_ban(self, guild: discord.Guild, user: discord.User):
+        if not db_handler.check_guild(self.bot.CONN, guild.id):
+            return
+        log_ch = self._get_log_ch(guild.id)
+        if not log_ch:
+            return
+
+        # Brief wait so Discord's audit log has time to populate
+        await asyncio.sleep(1)
+
+        moderator = "Unknown"
+        reason    = "No reason provided"
+        try:
+            async for entry in guild.audit_logs(limit=5, action=discord.AuditLogAction.ban):
+                if entry.target.id == user.id:
+                    moderator = f"{entry.user.mention} | `{entry.user.id}`"
+                    if entry.reason:
+                        reason = entry.reason
+                    break
+        except (discord.Forbidden, discord.HTTPException):
+            pass
+
+        # If the ban was issued by the bot itself (name filter / panic), skip —
+        # those actions already produce their own detailed log entry.
+        if moderator != "Unknown" and f"`{self.bot.user.id}`" in moderator:
+            return
+
+        embed = discord.Embed(title="Member Banned", color=0xe74c3c)
+        embed.set_thumbnail(url=user.display_avatar.url)
+        embed.add_field(
+            name="Banned User",
+            value=f"{user.mention} | `{user.id}`",
+            inline=False,
+        )
+        embed.add_field(name="Username", value=str(user), inline=True)
+        embed.add_field(name="Banned By", value=moderator, inline=False)
+        embed.add_field(name="Reason", value=reason, inline=False)
+        embed.timestamp = discord.utils.utcnow()
+        embed.set_footer(text=f"Guild: {guild.name}")
         await self._safe_send(log_ch, embed=embed)
 
 

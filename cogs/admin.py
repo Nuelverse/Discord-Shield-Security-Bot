@@ -477,7 +477,7 @@ class Admin(commands.Cog):
     )
     async def add_channel(self, ctx: discord.ApplicationContext,
                           channel: Option(discord.abc.GuildChannel, "Channel to add", required=True,
-                                          channel_types=[ChannelType.text, ChannelType.news]),
+                                          channel_types=[ChannelType.text, ChannelType.news, ChannelType.forum]),
                           code: Option(int, "Your 6-digit 2FA code", required=True)):
         allowed, err = permissions.check(self.bot, ctx, 'owner')
         if not allowed:
@@ -518,7 +518,7 @@ class Admin(commands.Cog):
     )
     async def remove_channel(self, ctx: discord.ApplicationContext,
                              channel: Option(discord.abc.GuildChannel, "Channel to remove", required=True,
-                                             channel_types=[ChannelType.text, ChannelType.news]),
+                                             channel_types=[ChannelType.text, ChannelType.news, ChannelType.forum]),
                              code: Option(int, "Your 6-digit 2FA code", required=True)):
         allowed, err = permissions.check(self.bot, ctx, 'owner')
         if not allowed:

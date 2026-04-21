@@ -24,6 +24,8 @@ COGS = [
     'cogs.admin',          # add/remove managers, setup-guild, list, set-logs
     'cogs.moderation',     # role, bulk-role, export, channel utilities
     'cogs.audit',          # Message deletion/edit logging
+    'cogs.embeds',         # /embed send, edit, delete, list
+    'cogs.name_filter',    # /name-filter add, import, remove, list, test, set-action, cleanse
 ]
 
 
@@ -41,6 +43,7 @@ class PolyMockBot(discord.Bot):
         self.config = config
         self.master_user = int(os.getenv('MASTER_USER_ID'))
         self.CONN = None
+        self.deleted_by_filter = set()  # message IDs deleted by link filter — suppresses audit double-log
 
     async def on_ready(self):
         # Ensure the data directory exists for QR code PNGs

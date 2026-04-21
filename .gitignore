@@ -36,3 +36,6 @@ env/
 
 # Reference repos (not used in this project)
 HQ-Announce/
+
+# Offline simulation script (dev only)
+simulate.py

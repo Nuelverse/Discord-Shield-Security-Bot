@@ -17,6 +17,8 @@ A Discord security bot for a single server. Provides 2FA-gated command access, m
   - [Link Filter](#link-filter)
   - [Webhooks](#webhooks)
   - [Announcements](#announcements)
+  - [Embeds](#embeds)
+  - [Name Filter](#name-filter)
   - [Moderation](#moderation)
   - [Panic](#panic)
 - [Link Scanner](#link-scanner)
@@ -203,6 +205,43 @@ Webhook protection is always enabled by default. The bot deletes any webhook cre
 - The link filter still applies during the window. Any links to be included in the announcement must be whitelisted first via `/allow-link`.
 - If `/announce` is run again before the timer expires, the timer resets for a fresh full window.
 - All grant and revocation events are logged with a full timestamp to the audit log.
+
+---
+
+### Embeds
+
+Build and manage rich branded embeds sent as the bot. All write commands require 2FA. The target channel must be registered in the announcement channels list.
+
+| Command | Who Can Use | 2FA Required | Description |
+|---|---|---|---|
+| `/embed send channel code` | Announcers, server owner, bot owner | Yes | Opens a modal to build an embed (title, description, color, footer, image URL). Shows a live preview before posting. Default color is HashFoxLabs orange (`#f97316`). |
+| `/embed edit message_id channel code` | Announcers, server owner, bot owner | Yes | Pre-fills the modal with the current embed content. Shows a preview before updating. |
+| `/embed delete message_id channel code` | Announcers, server owner, bot owner | Yes | Deletes the embed from Discord and removes its record from the database. |
+| `/embed list [channel]` | Any registered user | No | Lists the 10 most recent bot-sent embeds in this server, optionally filtered by channel. Shows message IDs for use with edit/delete. |
+
+---
+
+### Name Filter
+
+Automatically blocks members whose username or nickname matches a configured pattern. Triggers on join, nickname changes, and global username changes. Trusted members (announcers) are exempt from filtering.
+
+| Command | Who Can Use | 2FA Required | Description |
+|---|---|---|---|
+| `/name-filter add phrase pattern code` | Announcers, server owner, bot owner | Yes | Add a single phrase filter. Matches anywhere in the name, case-insensitive. |
+| `/name-filter add regex pattern code` | Announcers, server owner, bot owner | Yes | Add a single regex filter. Validates syntax before saving. |
+| `/name-filter import phrase code` | Announcers, server owner, bot owner | Yes | Opens a modal. Paste 50+ phrase filters at once, one per line. |
+| `/name-filter import regex code` | Announcers, server owner, bot owner | Yes | Opens a modal. Paste 50+ regex filters at once, one per line. Invalid patterns are reported and skipped. |
+| `/name-filter remove filter_id code` | Announcers, server owner, bot owner | Yes | Remove a filter by its ID. |
+| `/name-filter list [page]` | Announcers, server owner, bot owner | No | Browse all active filters, 10 per page. Shows IDs, types, and current action in the footer. |
+| `/name-filter test name` | Announcers, server owner, bot owner | No | Check whether a specific name would be caught and which filter would catch it. |
+| `/name-filter set-action action code [timeout_hours]` | Announcers, server owner, bot owner | Yes | Set what happens on a match: `ban` (default), `kick`, or `timeout`. For timeout, specify hours (1–672, default 24). |
+| `/name-filter cleanse code` | Announcers, server owner, bot owner | Yes | Retroactively scans all current members and actions any matches. 5-minute guild cooldown. |
+
+**Filter types:**
+- **Phrase** — literal case-insensitive substring match. Use for exact keywords (`support`, `metamask`).
+- **Regex** — full Python regex. Use `(?i)` prefix for case-insensitive matching (`(?i)^admin`, `(?i) mod$`).
+
+**Log entries** include the matched name, which pattern triggered it, filter type, the trigger event (join / nickname change / username change), account age, and action taken.
 
 ---
 

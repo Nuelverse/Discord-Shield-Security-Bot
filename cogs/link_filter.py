@@ -185,6 +185,7 @@ class LinkFilter(commands.Cog):
         whitelist = db_handler.get_link_whitelist(self.bot.CONN, message.guild.id)
         blocked, label = link_scanner.scan(message.content, whitelist)
         if blocked:
+            self.bot.deleted_by_filter.add(message.id)
             try:
                 await message.delete()
             except (discord.Forbidden, discord.HTTPException):
@@ -211,6 +212,7 @@ class LinkFilter(commands.Cog):
         whitelist = db_handler.get_link_whitelist(self.bot.CONN, after.guild.id)
         blocked, label = link_scanner.scan(after.content, whitelist)
         if blocked:
+            self.bot.deleted_by_filter.add(after.id)
             try:
                 await after.delete()
             except (discord.Forbidden, discord.HTTPException):

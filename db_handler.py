@@ -149,6 +149,34 @@ def startup_db():
             disabled_by INTEGER NOT NULL,
             expires_at  DATETIME NOT NULL
         )""",
+
+        # Bot-sent embeds (tracked for edit/delete/list)
+        """CREATE TABLE IF NOT EXISTS embeds (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id    INTEGER NOT NULL,
+            channel_id  INTEGER NOT NULL,
+            message_id  INTEGER NOT NULL UNIQUE,
+            author_id   INTEGER NOT NULL,
+            title       TEXT,
+            description TEXT,
+            color       INTEGER NOT NULL DEFAULT 16741142,
+            footer      TEXT,
+            image_url   TEXT,
+            created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+        )""",
+
+        # Name filters (phrase and regex patterns checked on join / name change)
+        """CREATE TABLE IF NOT EXISTS name_filters (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id   INTEGER NOT NULL,
+            type       TEXT    NOT NULL CHECK(type IN ('phrase', 'regex')),
+            pattern    TEXT    NOT NULL,
+            added_by   INTEGER,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (guild_id, type, pattern),
+            FOREIGN KEY (guild_id) REFERENCES guilds(guild_id) ON DELETE CASCADE
+        )""",
     ]
 
     for sql in tables:
@@ -169,6 +197,8 @@ def _run_migrations(conn):
     migrations = [
         # Add announce_timeout column to guilds if missing
         "ALTER TABLE guilds ADD COLUMN announce_timeout INTEGER NOT NULL DEFAULT 300",
+        # Add name_filter_action column to guilds (default: ban)
+        "ALTER TABLE guilds ADD COLUMN name_filter_action TEXT DEFAULT 'ban'",
         # Ensure webhook_protection defaults to 1 (we can't change defaults via ALTER, just document)
     ]
     for sql in migrations:
@@ -667,3 +697,107 @@ def get_panic_channel_backups(conn, guild_id: int) -> list:
 def clear_panic_backups(conn, guild_id: int):
     _exec(conn, "DELETE FROM panic_role_backup WHERE guild_id=?", (guild_id,))
     _exec(conn, "DELETE FROM panic_channel_backup WHERE guild_id=?", (guild_id,))
+
+
+# ---------------------------------------------------------------------------
+# Embeds
+# ---------------------------------------------------------------------------
+
+def insert_embed(conn, guild_id: int, channel_id: int, message_id: int, author_id: int,
+                 title, description, color: int, footer, image_url):
+    _exec(conn,
+        """INSERT INTO embeds(guild_id, channel_id, message_id, author_id,
+                              title, description, color, footer, image_url)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (guild_id, channel_id, message_id, author_id, title, description, color, footer, image_url))
+
+
+def get_embed(conn, guild_id: int, message_id: int):
+    """Return embed record as dict, or None if not found in this guild."""
+    cur = conn.execute(
+        """SELECT message_id, channel_id, author_id, title, description,
+                  color, footer, image_url, created_at
+           FROM embeds WHERE guild_id=? AND message_id=?""",
+        (guild_id, message_id))
+    row = cur.fetchone()
+    if not row:
+        return None
+    keys = ('message_id', 'channel_id', 'author_id', 'title', 'description',
+            'color', 'footer', 'image_url', 'created_at')
+    return dict(zip(keys, row))
+
+
+def update_embed(conn, message_id: int, title, description, color: int, footer, image_url):
+    _exec(conn,
+        """UPDATE embeds SET title=?, description=?, color=?, footer=?, image_url=?
+           WHERE message_id=?""",
+        (title, description, color, footer, image_url, message_id))
+
+
+def delete_embed(conn, message_id: int):
+    _exec(conn, "DELETE FROM embeds WHERE message_id=?", (message_id,))
+
+
+# ---------------------------------------------------------------------------
+# Name filters
+# ---------------------------------------------------------------------------
+
+def insert_name_filter(conn, guild_id: int, filter_type: str, pattern: str, added_by: int) -> bool:
+    """Insert a name filter. Returns False if it already exists."""
+    try:
+        _exec(conn,
+            "INSERT INTO name_filters(guild_id, type, pattern, added_by) VALUES (?,?,?,?)",
+            (guild_id, filter_type, pattern, added_by))
+        return True
+    except sqlite3.IntegrityError:
+        return False
+
+
+def get_name_filters(conn, guild_id: int) -> list:
+    """Return all name filters for a guild as a list of dicts."""
+    cur = conn.execute(
+        "SELECT id, type, pattern FROM name_filters WHERE guild_id=? ORDER BY type, id",
+        (guild_id,))
+    return [{'id': r[0], 'type': r[1], 'pattern': r[2]} for r in cur.fetchall()]
+
+
+def delete_name_filter(conn, guild_id: int, filter_id: int) -> bool:
+    """Delete a filter by ID within the guild. Returns False if not found."""
+    cur = _exec(conn,
+        "DELETE FROM name_filters WHERE id=? AND guild_id=?",
+        (filter_id, guild_id))
+    return cur.rowcount > 0
+
+
+def get_name_filter_action(conn, guild_id: int) -> str:
+    """Return the configured action for name filter matches (default: 'ban')."""
+    cur = conn.execute(
+        "SELECT name_filter_action FROM guilds WHERE guild_id=?", (guild_id,))
+    row = cur.fetchone()
+    return (row[0] or 'ban') if row else 'ban'
+
+
+def set_name_filter_action(conn, guild_id: int, action: str):
+    _exec(conn,
+        "UPDATE guilds SET name_filter_action=? WHERE guild_id=?",
+        (action, guild_id))
+
+
+def get_recent_embeds(conn, guild_id: int, channel_id: int = None, limit: int = 10) -> list:
+    """Return up to `limit` most recent embeds as a list of dicts."""
+    if channel_id:
+        cur = conn.execute(
+            """SELECT message_id, channel_id, author_id, title,
+                      CAST(strftime('%s', created_at) AS INTEGER) as created_ts
+               FROM embeds WHERE guild_id=? AND channel_id=?
+               ORDER BY created_at DESC LIMIT ?""",
+            (guild_id, channel_id, limit))
+    else:
+        cur = conn.execute(
+            """SELECT message_id, channel_id, author_id, title,
+                      CAST(strftime('%s', created_at) AS INTEGER) as created_ts
+               FROM embeds WHERE guild_id=?
+               ORDER BY created_at DESC LIMIT ?""",
+            (guild_id, limit))
+    keys = ('message_id', 'channel_id', 'author_id', 'title', 'created_ts')
+    return [dict(zip(keys, row)) for row in cur.fetchall()]
