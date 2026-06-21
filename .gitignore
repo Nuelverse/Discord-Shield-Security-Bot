@@ -1,14 +1,24 @@
 # Environment & secrets
 .env
 *.env
+.env.local
+.env.*.local
 
 # Database
 *.db
 *.db-shm
 *.db-wal
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
 
 # QR codes (generated at runtime)
 data/*.png
+
+# Orphaned assets from unused features
+data/quiz_images/
 
 # Python
 __pycache__/
@@ -27,6 +37,7 @@ env/
 .vscode/
 .idea/
 *.swp
+.DS_Store
 
 # Claude Code local settings
 .claude/
@@ -34,7 +45,7 @@ env/
 # Testing cache
 .pytest_cache/
 
-# Reference repos (not used in this project)
+# Reference repos 
 HQ-Announce/
 
 # Offline simulation script (dev only)

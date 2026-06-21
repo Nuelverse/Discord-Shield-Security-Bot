@@ -17,7 +17,7 @@ Commands (all under /embed):
       List the 10 most recent bot embeds in this server (or a specific
       channel). No 2FA required — read-only.
 
-Brand color: #f97316 (HashFoxLabs orange) — applied when color is blank.
+Default brand color: #5865f2 (Discord blurple) — applied when color is left blank.
 """
 
 import discord
@@ -29,7 +29,7 @@ import two_factor_helper
 import permissions
 import logger
 
-BRAND_COLOR = 0xF97316  # HashFoxLabs orange
+BRAND_COLOR = 0x5865F2  # Default brand color (Discord blurple) — change to match your server's branding
 
 
 # ---------------------------------------------------------------------------
@@ -79,7 +79,7 @@ class EmbedBuilderModal(discord.ui.Modal):
 
         self.add_item(discord.ui.InputText(
             label="Post Title (becomes the forum thread name)" if is_forum else "Title",
-            placeholder="e.g. What is HashFoxLabs?" if is_forum else "Embed title (optional)",
+            placeholder="e.g. Server announcement title" if is_forum else "Embed title (optional)",
             required=is_forum,
             max_length=100 if is_forum else 256,
             value=p.get('title') or None,
@@ -93,11 +93,11 @@ class EmbedBuilderModal(discord.ui.Modal):
             value=p.get('description') or None,
         ))
         self.add_item(discord.ui.InputText(
-            label="Color hex (clear to use brand orange)",
-            placeholder="#f97316",
+            label="Color hex (clear to use default color)",
+            placeholder="#5865f2",
             required=False,
             max_length=7,
-            value=p.get('color') or '#f97316',
+            value=p.get('color') or '#5865f2',
         ))
         self.add_item(discord.ui.InputText(
             label="Footer",
@@ -296,7 +296,7 @@ class Embeds(commands.Cog):
 
     @embed.command(
         name="send",
-        description="Build and send a branded embed to an announcement channel. Announcers/owners. Requires 2FA.",
+        description="Build and send an embed to an announcement channel. Announcers/owners. Requires 2FA.",
     )
     @commands.cooldown(1, 10, commands.BucketType.user)
     async def embed_send(

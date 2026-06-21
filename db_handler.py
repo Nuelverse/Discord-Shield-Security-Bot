@@ -213,7 +213,7 @@ def _run_migrations(conn):
     try:
         conn.execute("UPDATE guilds SET announce_timeout = 300 WHERE announce_timeout = 120")
         conn.commit()
-    except Exception:
+    except Exception:  # nosec B110 — trusted_members FK fix is idempotent; failure is non-fatal
         pass
 
     # Remove the erroneous FK on trusted_members.member_id → users.user_id.
@@ -566,7 +566,7 @@ def is_filter_exempt_by_roles(conn, guild_id: int, role_ids: list) -> bool:
     if not role_ids:
         return False
     placeholders = ','.join('?' * len(role_ids))
-    cur = conn.execute(
+    cur = conn.execute(  # nosec B608 — placeholders is only '?,?,?' from len(); values are parameterized
         f"SELECT EXISTS(SELECT 1 FROM link_filter_whitelist "
         f"WHERE guild_id=? AND entity_type='role' AND entity_id IN ({placeholders}))",
         (guild_id, *role_ids))

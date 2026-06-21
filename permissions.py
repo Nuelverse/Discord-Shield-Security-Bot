@@ -1,5 +1,5 @@
 """
-Permission helpers for PolyMock Security Bot.
+Permission helpers for SecurityBot.
 
 Hierarchy (highest to lowest):
   BOT_OWNER   — MASTER_USER_ID in .env; cross-server + all destructive commands

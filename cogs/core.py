@@ -92,7 +92,7 @@ class Core(commands.Cog):
         codes_block = "\n".join(backup_codes)
 
         await ctx.respond(
-            "**2FA Setup — PolyMock Security Bot**\n\n"
+            "**2FA Setup — Security Bot**\n\n"
             "1. Open **Authy** or **Google Authenticator** — never scan QR codes with Discord mobile.\n"
             "2. Scan the QR code below, or add manually as a **Time-based OTP** using this key:\n"
             f"```{secret}```\n"

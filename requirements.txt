@@ -3,4 +3,5 @@ pyotp
 pyqrcode
 pypng
 python-dotenv
-aiohttp
+aiohttp>=3.14.1
+idna>=3.15

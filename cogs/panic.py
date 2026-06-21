@@ -160,7 +160,7 @@ class Panic(commands.Cog):
                     await event.delete()
                 except (discord.Forbidden, discord.HTTPException):
                     pass
-        except Exception:
+        except Exception:  # nosec B110 — scheduled events are non-critical during panic
             pass
 
         # Phase 4: Lock all channels
@@ -353,11 +353,16 @@ class Panic(commands.Cog):
             return
 
         parts = content.split()
-        if len(parts) != 3:
-            await message.channel.send("Format: `panic <guild_id> <6-digit-2fa-code>`")
+        # Expected: panic <guild_id> <code> CONFIRM LOCKDOWN  (5 tokens)
+        if len(parts) < 5:
+            await message.channel.send(
+                f"Format: `panic <guild_id> <6-digit-2fa-code> {CONFIRM_PHRASE}`"
+            )
             return
 
-        _, guild_id_str, code_str = parts
+        guild_id_str = parts[1]
+        code_str = parts[2]
+        confirm = " ".join(parts[3:])
         try:
             guild_id = int(guild_id_str)
             code = int(code_str)
@@ -372,6 +377,12 @@ class Panic(commands.Cog):
 
         if not db_handler.check_guild(self.bot.CONN, guild_id):
             await message.channel.send("That server is not set up with this bot.")
+            return
+
+        if confirm != CONFIRM_PHRASE:
+            await message.channel.send(
+                f"Confirmation phrase must be exactly: `{CONFIRM_PHRASE}`"
+            )
             return
 
         if not two_factor_helper.verify_code(self.bot.CONN, message.author.id, code):

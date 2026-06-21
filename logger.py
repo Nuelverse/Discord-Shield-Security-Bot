@@ -1,5 +1,5 @@
 """
-Centralized logging utility for PolyMock Security Bot.
+Centralized logging utility for SecurityBot.
 
 All security-relevant actions are logged as Discord embeds to the guild's
 configured log channel. Every state-changing command MUST call log_action()

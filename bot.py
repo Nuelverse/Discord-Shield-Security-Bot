@@ -29,7 +29,7 @@ COGS = [
 ]
 
 
-class PolyMockBot(discord.Bot):
+class SecurityBot(discord.Bot):
     def __init__(self):
         intents = discord.Intents.default()
         intents.members = True
@@ -60,7 +60,7 @@ class PolyMockBot(discord.Bot):
         print('----------------------------------')
 
 
-bot = PolyMockBot()
+bot = SecurityBot()
 
 for cog in COGS:
     bot.load_extension(cog)
@@ -83,7 +83,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
         print(f"[ERROR] Unhandled error in /{ctx.command}: {type(error).__name__}: {error}")
         try:
             await ctx.respond("An unexpected error occurred. Please try again.", ephemeral=True)
-        except Exception:
+        except Exception:  # nosec B110 — ctx may be expired; silently drop
             pass
 
 

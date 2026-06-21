@@ -186,7 +186,7 @@ def is_allowed(url: str, whitelist: list[tuple[str, str]]) -> bool:
         entry_norm = _normalize_url(entry_url)
         try:
             entry_parsed = urlparse(entry_norm)
-        except Exception:
+        except Exception:  # nosec B112 — skip malformed whitelist entries gracefully
             continue
 
         entry_host = entry_parsed.netloc.lstrip("www.").split(":")[0]

@@ -112,7 +112,7 @@ async def _take_action(
 
     # Build the audit-log reason string (appears in Discord's audit log)
     audit_reason = (
-        f"[HashFox Name Filter] {trigger} — "
+        f"[Name Filter] {trigger} — "
         f"[{matched_filter['type'].upper()}] `{matched_filter['pattern']}` "
         f"matched name: {matched_name!r}"
     )
@@ -534,7 +534,7 @@ class NameFilter(commands.Cog):
                 f"Action on match: **{action_label}**\n"
                 f"Requested by {ctx.author.mention}"
             ),
-            color=0xF97316,
+            color=0x5865F2,
             timestamp=discord.utils.utcnow(),
         )
         await log_ch.send(embed=summary)

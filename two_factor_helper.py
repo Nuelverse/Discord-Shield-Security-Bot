@@ -20,8 +20,8 @@ def setup_and_get_path(ctx, connection):
     file_token = pyotp.random_base32()
     user_id = int(ctx.user.id)
     uri = pyotp.totp.TOTP(secret).provisioning_uri(
-        name="PolyMock Security",
-        issuer_name="PolyMock Bot"
+        name="Security Bot",
+        issuer_name="SecurityBot"
     )
     qr = pyqrcode.create(uri, error='L')
     png_path = f'./data/QR-{file_token}.png'
