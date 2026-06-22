@@ -12,6 +12,7 @@ Commands:
   /lock-threads        — Lock and archive all threads in a channel.
   /export              — Export all members with their roles to a CSV file.
   /export-category     — Export all messages per channel in a category to a zip of CSVs.
+  /export-permissions  — Export all roles and permissions to a colour-coded Excel file.
   /list-overrides      — List all channels with user-specific permission overrides.
 
 All commands require server owner or bot owner access.
@@ -21,6 +22,8 @@ import csv
 import io
 import zipfile
 import discord
+import openpyxl
+from openpyxl.styles import Alignment, Font, PatternFill
 from discord.ext import commands
 from discord.commands import Option
 import db_handler
@@ -35,6 +38,76 @@ DANGEROUS_PERMISSIONS = [
     "ban_members", "kick_members", "manage_webhooks", "view_audit_log",
     "manage_expressions", "manage_threads", "mention_everyone", "moderate_members",
 ]
+
+# ---------------------------------------------------------------------------
+# export-permissions — Excel styling constants
+# ---------------------------------------------------------------------------
+
+_GREEN_FILL  = PatternFill(fill_type="solid", fgColor="C6EFCE")   # allowed
+_RED_FILL    = PatternFill(fill_type="solid", fgColor="FFC7CE")   # denied
+_HEADER_FILL = PatternFill(fill_type="solid", fgColor="23272A")   # Discord dark
+_HEADER_FONT = Font(bold=True, color="FFFFFF")
+_BOLD        = Font(bold=True)
+_CENTER      = Alignment(horizontal="center", vertical="center")
+
+_CHANNEL_TYPE = {
+    "TextChannel":  "Text",
+    "VoiceChannel": "Voice",
+    "StageChannel": "Stage",
+    "ForumChannel": "Forum",
+    "NewsChannel":  "News",
+}
+
+# Every Discord permission with a human-readable label (ordered by category)
+_PERM_LABELS = {
+    # General server
+    "administrator":            "Administrator",
+    "manage_guild":             "Manage Server",
+    "manage_roles":             "Manage Roles",
+    "manage_channels":          "Manage Channels",
+    "manage_webhooks":          "Manage Webhooks",
+    "manage_expressions":       "Manage Expressions",
+    "manage_events":            "Manage Events",
+    "manage_threads":           "Manage Threads",
+    "manage_nicknames":         "Manage Nicknames",
+    "kick_members":             "Kick Members",
+    "ban_members":              "Ban Members",
+    "moderate_members":         "Timeout Members",
+    "view_audit_log":           "View Audit Log",
+    "view_guild_insights":      "View Server Insights",
+    "create_instant_invite":    "Create Invites",
+    "change_nickname":          "Change Nickname",
+    "mention_everyone":         "Mention @everyone",
+    # Text
+    "view_channel":             "View Channels",
+    "send_messages":            "Send Messages",
+    "send_messages_in_threads": "Send in Threads",
+    "create_public_threads":    "Create Public Threads",
+    "create_private_threads":   "Create Private Threads",
+    "manage_messages":          "Manage Messages",
+    "embed_links":              "Embed Links",
+    "attach_files":             "Attach Files",
+    "add_reactions":            "Add Reactions",
+    "use_external_emojis":      "Use External Emojis",
+    "use_external_stickers":    "Use External Stickers",
+    "read_message_history":     "Read Message History",
+    "send_tts_messages":        "Send TTS Messages",
+    "use_application_commands": "Use Slash Commands",
+    "send_voice_messages":      "Send Voice Messages",
+    "request_to_speak":         "Request to Speak (Stage)",
+    # Voice
+    "connect":                  "Connect (Voice)",
+    "speak":                    "Speak (Voice)",
+    "stream":                   "Video / Go Live",
+    "use_voice_activation":     "Use Voice Activity",
+    "priority_speaker":         "Priority Speaker",
+    "mute_members":             "Mute Members (Voice)",
+    "deafen_members":           "Deafen Members (Voice)",
+    "move_members":             "Move Members (Voice)",
+    "use_embedded_activities":  "Use Activities",
+    "use_soundboard":           "Use Soundboard",
+    "use_external_sounds":      "Use External Sounds",
+}
 
 
 def role_has_dangerous_perms(role: discord.Role) -> bool:
@@ -650,6 +723,176 @@ class Moderation(commands.Cog):
                 "Category": category.name,
                 "Channels": str(len(text_channels)),
                 "Messages": str(total_messages),
+            },
+            level='info'
+        )
+
+    # ------------------------------------------------------------------
+    # /export-permissions
+    # ------------------------------------------------------------------
+
+    @commands.guild_only()
+    @commands.slash_command(
+        name="export-permissions",
+        description="[Owner] Export all roles and their permissions to a colour-coded Excel file. Requires 2FA."
+    )
+    async def export_permissions(self, ctx: discord.ApplicationContext,
+                                 code: Option(int, "Your 6-digit 2FA code", required=True)):
+        allowed, err = self._check_owner(ctx)
+        if not allowed:
+            await ctx.respond(err, ephemeral=True)
+            return
+
+        if not two_factor_helper.verify_code(self.bot.CONN, ctx.author.id, code):
+            await ctx.respond("Incorrect 2FA code.", ephemeral=True)
+            return
+
+        await ctx.defer(ephemeral=True)
+
+        guild = ctx.guild
+        # Highest role first so Administrator appears near the left
+        roles = list(reversed(guild.roles))
+
+        wb = openpyxl.Workbook()
+
+        # ── Sheet 1: Server-Level Permissions ──────────────────────────────
+        ws1 = wb.active
+        ws1.title = "Server Permissions"
+        ws1.freeze_panes = "B2"  # Keep first row + column locked while scrolling
+
+        # Corner label
+        corner = ws1.cell(1, 1, "Permission")
+        corner.font = _HEADER_FONT
+        corner.fill = _HEADER_FILL
+        corner.alignment = _CENTER
+
+        # Role name headers (one column per role)
+        for col_idx, role in enumerate(roles, start=2):
+            cell = ws1.cell(1, col_idx, role.name)
+            cell.font = _HEADER_FONT
+            cell.fill = _HEADER_FILL
+            cell.alignment = _CENTER
+
+        # One row per permission
+        for row_idx, (perm_key, perm_label) in enumerate(_PERM_LABELS.items(), start=2):
+            ws1.cell(row_idx, 1, perm_label).font = _BOLD
+            for col_idx, role in enumerate(roles, start=2):
+                # Administrator implicitly grants every permission
+                if role.permissions.administrator:
+                    has_perm = True
+                else:
+                    has_perm = getattr(role.permissions, perm_key, False)
+                cell = ws1.cell(row_idx, col_idx, "✅" if has_perm else "❌")
+                cell.alignment = _CENTER
+                cell.fill = _GREEN_FILL if has_perm else _RED_FILL
+
+        # Column widths
+        ws1.column_dimensions["A"].width = 28
+        for col_idx, role in enumerate(roles, start=2):
+            col_letter = openpyxl.utils.get_column_letter(col_idx)
+            ws1.column_dimensions[col_letter].width = max(len(role.name) + 2, 12)
+
+        # ── Sheet 2: Category Overrides ────────────────────────────────────
+        ws2 = wb.create_sheet("Category Overrides")
+        for col_idx, header in enumerate(["Category", "Role", "Permission", "Override"], start=1):
+            cell = ws2.cell(1, col_idx, header)
+            cell.font = _HEADER_FONT
+            cell.fill = _HEADER_FILL
+            cell.alignment = _CENTER
+
+        has_cat_data = False
+        for category in guild.categories:
+            for target, overwrite in category.overwrites.items():
+                if not isinstance(target, discord.Role):
+                    continue
+                allow_perms, deny_perms = overwrite.pair()
+                for perm_key, perm_label in _PERM_LABELS.items():
+                    is_allow = getattr(allow_perms, perm_key, False)
+                    is_deny  = getattr(deny_perms,  perm_key, False)
+                    if not is_allow and not is_deny:
+                        continue  # ➖ Inherited — skip to keep sheet concise
+                    has_cat_data = True
+                    override_str = "✅ Allow" if is_allow else "❌ Deny"
+                    row = ws2.max_row + 1
+                    ws2.cell(row, 1, category.name)
+                    ws2.cell(row, 2, target.name)
+                    ws2.cell(row, 3, perm_label)
+                    ov_cell = ws2.cell(row, 4, override_str)
+                    ov_cell.fill = _GREEN_FILL if is_allow else _RED_FILL
+                    ov_cell.alignment = _CENTER
+
+        if not has_cat_data:
+            ws2.cell(2, 1, "No role overrides found on any category.")
+
+        for col_letter, width in zip("ABCD", [25, 22, 28, 12]):
+            ws2.column_dimensions[col_letter].width = width
+
+        # ── Sheet 3: Channel Overrides ─────────────────────────────────────
+        ws3 = wb.create_sheet("Channel Overrides")
+        for col_idx, header in enumerate(
+            ["Channel", "Type", "Category", "Role", "Permission", "Override"], start=1
+        ):
+            cell = ws3.cell(1, col_idx, header)
+            cell.font = _HEADER_FONT
+            cell.fill = _HEADER_FILL
+            cell.alignment = _CENTER
+
+        has_ch_data = False
+        sorted_channels = sorted(
+            (c for c in guild.channels if not isinstance(c, discord.CategoryChannel)),
+            key=lambda c: (c.category.position if c.category else -1, c.position)
+        )
+        for channel in sorted_channels:
+            category_name = channel.category.name if channel.category else "— No Category —"
+            ch_type = _CHANNEL_TYPE.get(type(channel).__name__, "Channel")
+            for target, overwrite in channel.overwrites.items():
+                if not isinstance(target, discord.Role):
+                    continue
+                allow_perms, deny_perms = overwrite.pair()
+                for perm_key, perm_label in _PERM_LABELS.items():
+                    is_allow = getattr(allow_perms, perm_key, False)
+                    is_deny  = getattr(deny_perms,  perm_key, False)
+                    if not is_allow and not is_deny:
+                        continue
+                    has_ch_data = True
+                    override_str = "✅ Allow" if is_allow else "❌ Deny"
+                    row = ws3.max_row + 1
+                    ws3.cell(row, 1, channel.name)
+                    ws3.cell(row, 2, ch_type)
+                    ws3.cell(row, 3, category_name)
+                    ws3.cell(row, 4, target.name)
+                    ws3.cell(row, 5, perm_label)
+                    ov_cell = ws3.cell(row, 6, override_str)
+                    ov_cell.fill = _GREEN_FILL if is_allow else _RED_FILL
+                    ov_cell.alignment = _CENTER
+
+        if not has_ch_data:
+            ws3.cell(2, 1, "No role overrides found on any channel.")
+
+        for col_letter, width in zip("ABCDEF", [25, 10, 22, 22, 28, 12]):
+            ws3.column_dimensions[col_letter].width = width
+
+        # ── Send file ──────────────────────────────────────────────────────
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        non_cat_channels = [c for c in guild.channels if not isinstance(c, discord.CategoryChannel)]
+        file = discord.File(buffer, filename=f"permissions_{guild.name}.xlsx")
+        await ctx.respond(
+            f"Permission export ready — **{len(roles)}** roles · "
+            f"**{len(guild.categories)}** categories · "
+            f"**{len(non_cat_channels)}** channels.",
+            file=file,
+            ephemeral=True,
+        )
+
+        await logger.log_action(
+            self.bot, ctx.guild, "Permissions Exported", ctx.author,
+            details={
+                "Roles": str(len(roles)),
+                "Categories": str(len(guild.categories)),
+                "Channels": str(len(non_cat_channels)),
             },
             level='info'
         )

@@ -113,6 +113,7 @@ Send, edit, and delete rich embeds as the bot from within Discord — no dashboa
 - Channel permission management — toggle access, sync category, restrict to single channel
 - Thread locking — lock all threads in a channel or server-wide
 - Member and role CSV export
+- **Permission export** — full colour-coded Excel snapshot of every role's permissions at server level, per category, and per channel
 - Channel permission override audit
 
 ### Audit Logging
@@ -133,8 +134,8 @@ Structured embed logs posted to your configured log channel for every security e
 
 ```bash
 # 1. Clone / download the repo
-git clone <your-repo-url>
-cd security-bot
+git clone https://github.com/Nuelverse/Discord-Shield-Security-Bot
+cd Discord-Shield-Security-Bot
 
 # 2. Create virtual environment
 python -m venv .venv
@@ -296,9 +297,10 @@ Admin runs /add-linkmanager or /add-announcer
 | `/sync-channels category` | Server owner, bot owner | No | Sync all channels in a category to category permissions. |
 | `/restrict-channel member action channel` | Server owner, bot owner | No | Restrict a member to one channel. `action`: `add` or `remove`. |
 | `/lock-threads [channel]` | Server owner, bot owner | No | Lock all active and archived threads in a channel or server-wide. |
-| `/export` | Server owner, bot owner | No | Export all server members and their roles as a CSV file. |
-| `/export-category category` | Server owner, bot owner | No | Export message history from all text channels in a category as a ZIP of CSVs. |
-| `/list-overrides` | Server owner, bot owner | No | List all channels with user-specific permission overrides. |
+| `/export` | Server owner, bot owner | Yes | Export all server members and their roles as a CSV file. |
+| `/export-category category` | Server owner, bot owner | Yes | Export message history from all text channels in a category as a ZIP of CSVs. |
+| `/export-permissions` | Server owner, bot owner | Yes | Export every role's permissions to a colour-coded `.xlsx` file — server level on Sheet 1, category overrides on Sheet 2, channel overrides on Sheet 3. Green = allowed, red = denied. |
+| `/list-overrides` | Server owner, bot owner | Yes | List all channels with user-specific permission overrides. |
 
 ### Panic
 
@@ -366,6 +368,7 @@ pytest
 - **2FA:** [pyotp](https://github.com/pyauth/pyotp) (TOTP, RFC 6238 compliant)
 - **QR codes:** [pyqrcode](https://github.com/mnooner256/pyqrcode) + pypng
 - **Config:** python-dotenv
+- **Excel export:** [openpyxl](https://openpyxl.readthedocs.io/) (permission audit workbooks)
 
 ---
 
@@ -375,7 +378,7 @@ pytest
 - Backup codes are SHA-256 hashed before storage and deleted on use (single-use).
 - QR code PNGs are written to disk and auto-deleted within 60 seconds by a background task.
 - The SQLite database uses foreign key constraints, WAL mode, and parameterized queries throughout.
-- The link scanner uses iterative percent-decoding (up to 3 passes) and Unicode normalization to defeat obfuscation.
+- The link scanner runs 5 detection passes. Within the deep-scan pass, percent-decoding is applied iteratively (up to 3 decode iterations) to catch double-encoded URLs.
 
 ---
 
@@ -402,6 +405,7 @@ For custom deployment, configuration, or integration into your Web3 project's Di
 [![GitHub](https://img.shields.io/badge/GitHub-Nuelverse-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Nuelverse)
 [![X](https://img.shields.io/badge/X-@nuelverse-000000?style=for-the-badge&logo=x&logoColor=white)](https://x.com/nuelverse)
 [![Discord](https://img.shields.io/badge/Discord-nuelverse-5865F2?style=for-the-badge&logo=discord&logoColor=white)](https://discord.com/users/1039501090917457950)
+[![Email](https://img.shields.io/badge/Email-nuelverse%40proton.me-6D4AFF?style=for-the-badge&logo=protonmail&logoColor=white)](mailto:nuelverse@proton.me)
   
 *If this bot protects your server, consider reaching out.*
 
